@@ -18,6 +18,7 @@ from ..domain.ns import NamespaceRegistry
 from ..domain.recipe import RecipeRegistry
 from ..domain.temp import TemperatureController
 from ..domain.wort import WortSystem
+from ..domain.yeast import YeastLibrary
 from ..persistence.store import FileStore
 from .brewing import BrewingService
 from .control import ControlService
@@ -43,6 +44,7 @@ class ComponentRegistry:
         self.temp = TemperatureController(self.store, self.settings, self.clock)
         self.co2 = CO2Controller(self.store, self.settings, self.clock, self.alarms)
         self.cip = CIPService(self.store, self.settings, self.clock, self.alarms)
+        self.yeast = YeastLibrary(self.store, self.settings, self.clock, self.alarms)
         self.tanks = FermentTankService(
             self.store, self.settings, self.clock, self.cip, self.co2, self.alarms
         )
@@ -61,6 +63,7 @@ class ComponentRegistry:
             self.co2,
             self.alarms,
             self.audit,
+            self.yeast,
         )
         self.control = ControlService(self.temp, self.co2, self.alarms, self.audit)
         self.telemetry = TelemetryService(self.temp, self.alarms, self.audit)
@@ -128,6 +131,7 @@ class ComponentRegistry:
             "mash": self.mash.summary(),
             "boil": self.boil.summary(),
             "ferment": self.tanks.summary(),
+            "yeast": self.yeast.summary(),
             "maintenance": self.maintenance.summary(),
             "control": self.control.summary(),
             "alarms": self.alarms.summary(),

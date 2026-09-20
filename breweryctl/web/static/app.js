@@ -161,8 +161,171 @@ async function initFermentPage() {
   await loadBanner();
   await loadBatches("batch-select");
   await loadTanks("tank-select");
+  await refreshQualifiedCultures();
   await refreshBatch();
   await refreshTankSnapshot();
+}
+
+async function refreshQualifiedCultures() {
+  const payload = await apiGet("/api/yeast/cultures?status=qualified");
+  const select = element("pitch-culture");
+  if (!select) {
+    return payload;
+  }
+  select.innerHTML = "";
+  payload.cultures.forEach((item) => {
+    const option = document.createElement("option");
+    option.value = item.id;
+    option.textContent =
+      item.code + " · " + item.strain + " · 第" + item.generation + "代 · " + item.viability_pct + "%";
+    select.appendChild(option);
+  });
+  if (!payload.cultures.length) {
+    const option = document.createElement("option");
+    option.value = "";
+    option.textContent = "无合格在库酵母，请先扩培检测";
+    select.appendChild(option);
+  }
+  return payload;
+}
+
+async function initYeastPage() {
+  const overview = await loadBanner();
+  const yeast = overview.yeast || {};
+  write("banner-yeast", yeast.qualified || 0);
+  write("banner-yeast-quarantine", yeast.quarantined || 0);
+  await loadYeastSummary();
+  await loadCultures();
+}
+
+async function loadYeastSummary() {
+  const payload = await apiGet("/api/yeast/summary");
+  write("yeast-summary", payload.summary);
+  return payload;
+}
+
+function fillCultureSelect(selectId, cultures, withEmpty) {
+  const select = element(selectId);
+  if (!select) {
+    return;
+  }
+  select.innerHTML = "";
+  if (withEmpty) {
+    const empty = document.createElement("option");
+    empty.value = "";
+    empty.textContent = "（无母罐）";
+    select.appendChild(empty);
+  }
+  cultures.forEach((item) => {
+    const option = document.createElement("option");
+    option.value = item.id;
+    option.textContent =
+      item.code + " · " + item.strain + " · 第" + item.generation + "代 · " + item.status;
+    select.appendChild(option);
+  });
+}
+
+async function loadCultures() {
+  const payload = await apiGet("/api/yeast/cultures");
+  STATE.cultures = payload.cultures;
+  fillCultureSelect("culture-select", payload.cultures, false);
+  const consumed = payload.cultures.filter((item) => item.status === "consumed");
+  fillCultureSelect("reg-parent", consumed, true);
+  renderCultureRows(payload.cultures);
+  await loadCultureDetail();
+  return payload;
+}
+
+function renderCultureRows(cultures) {
+  const tbody = element("culture-rows");
+  if (!tbody) {
+    return;
+  }
+  tbody.innerHTML = "";
+  cultures.forEach((item) => {
+    const row = document.createElement("tr");
+    row.innerHTML =
+      "<td>" + item.code + "</td>" +
+      "<td>" + item.strain + "</td>" +
+      "<td>" + item.source + "</td>" +
+      "<td>第" + item.generation + "代</td>" +
+      "<td>" + item.status + "</td>" +
+      "<td>" + (item.viability_pct == null ? "-" : item.viability_pct) + "</td>" +
+      "<td>" + item.volume_l + "</td>" +
+      "<td>" + (item.consumed_batch_id || "-") + "</td>" +
+      "<td></td>";
+    const actions = row.lastElementChild;
+    const pick = document.createElement("button");
+    pick.textContent = "选择";
+    pick.className = "secondary";
+    pick.onclick = () => {
+      element("culture-select").value = item.id;
+      loadCultureDetail();
+    };
+    actions.appendChild(pick);
+    tbody.appendChild(row);
+  });
+}
+
+async function loadCultureDetail() {
+  const cultureId = value("culture-select");
+  if (!cultureId) {
+    return null;
+  }
+  const payload = await apiGet("/api/yeast/cultures/" + cultureId);
+  write("culture-detail", payload);
+  return payload;
+}
+
+async function registerCulture() {
+  const source = value("reg-source");
+  const cells = value("reg-cells");
+  const brewery = value("reg-brewery");
+  let breweryId = brewery;
+  if (!breweryId) {
+    const overview = await apiGet("/api/state");
+    breweryId = overview.namespace && overview.namespace.default_brewery_id;
+  }
+  const payload = await apiPost("/api/yeast/cultures", {
+    brewery_id: breweryId,
+    strain: value("reg-strain"),
+    source: source,
+    volume_l: numberValue("reg-volume"),
+    cell_count_m_ml: cells ? Number(cells) : null,
+    parent_id: source === "cropped" ? value("reg-parent") : null,
+    operator: value("reg-operator") || "console",
+  });
+  addLog("yeast-log", "已登记 " + payload.culture.code, payload);
+  return payload;
+}
+
+async function submitAssay() {
+  const cultureId = value("culture-select");
+  const cells = value("assay-cells");
+  const payload = await apiPost("/api/yeast/cultures/" + cultureId + "/assay", {
+    viability_pct: numberValue("assay-viability"),
+    cell_count_m_ml: cells ? Number(cells) : null,
+    operator: value("assay-operator") || "console",
+  });
+  addLog("assay-log", "检测完成：" + payload.culture.status, payload);
+  return payload;
+}
+
+async function discardCulture() {
+  const cultureId = value("culture-select");
+  const payload = await apiPost("/api/yeast/cultures/" + cultureId + "/discard", {
+    reason: value("discard-reason") || "人工废弃",
+    operator: value("assay-operator") || "console",
+  });
+  addLog("assay-log", "已废弃 " + payload.culture.code, payload);
+  return payload;
+}
+
+async function loadLineage() {
+  const cultureId = value("culture-select");
+  const payload = await apiGet("/api/yeast/cultures/" + cultureId + "/lineage");
+  write("lineage-view", payload);
+  return payload;
 }
 
 async function initCipPage() {

@@ -77,9 +77,32 @@ def tank_summary(document: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def yeast_summary(document: dict[str, Any]) -> dict[str, Any]:
+    """酵母扩培批次列表项。"""
+
+    return {
+        "id": document.get("id"),
+        "code": document.get("code"),
+        "strain": document.get("strain"),
+        "source": document.get("source"),
+        "generation": document.get("generation"),
+        "status": document.get("status"),
+        "volume_l": document.get("volume_l"),
+        "viability_pct": document.get("viability_pct"),
+        "cell_count_m_ml": document.get("cell_count_m_ml"),
+        "parent_id": document.get("parent_id"),
+        "lineage": document.get("lineage", []),
+        "consumed_batch_id": document.get("consumed_batch_id"),
+        "consumed_tank_id": document.get("consumed_tank_id"),
+        "reject_reason": document.get("reject_reason"),
+        "assay_at": document.get("assay_at"),
+        "registered_at": document.get("registered_at"),
+        "updated_at": document.get("updated_at"),
+    }
+
+
 def alarm_view(document: dict[str, Any]) -> dict[str, Any]:
     """告警列表项。"""
-
     return {
         "id": document.get("id"),
         "source": document.get("source"),

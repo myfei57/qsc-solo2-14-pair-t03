@@ -113,6 +113,24 @@ class ReadingQuality(str, Enum):
     REJECTED = "rejected"
 
 
+class YeastCultureStatus(str, Enum):
+    """扩培酵母批次的生命周期。"""
+
+    REGISTERED = "registered"
+    QUALIFIED = "qualified"
+    QUARANTINED = "quarantined"
+    CONSUMED = "consumed"
+    DISCARDED = "discarded"
+
+
+class YeastSource(str, Enum):
+    """酵母来源。"""
+
+    PITCHED = "pitched"
+    PROPAGATED = "propagated"
+    CROPPED = "cropped"
+
+
 class DocMixin:
     """把数据类转换为可持久化文档。"""
 
@@ -235,6 +253,9 @@ class FermentTank(DocMixin):
     pitched_at: str | None = None
     fermenting_at: str | None = None
     matured_at: str | None = None
+    yeast_culture_id: str | None = None
+    yeast_strain: str | None = None
+    yeast_generation: int | None = None
     updated_at: str = ""
 
 
@@ -375,6 +396,47 @@ class AuditEntry(DocMixin):
 
 
 @dataclass
+class YeastCulture(DocMixin):
+    """一罐扩培酵母的批次档案与代次链。"""
+
+    id: str
+    code: str
+    brewery_id: str
+    strain: str
+    source: str
+    generation: int
+    volume_l: float
+    status: str = YeastCultureStatus.REGISTERED.value
+    parent_id: str | None = None
+    lineage: list[str] = field(default_factory=list)
+    viability_pct: float | None = None
+    cell_count_m_ml: float | None = None
+    assay_at: str | None = None
+    assay_operator: str | None = None
+    reject_reason: str | None = None
+    registered_at: str = ""
+    registered_by: str = ""
+    updated_at: str = ""
+
+
+@dataclass
+class YeastPitch(DocMixin):
+    """一次酵母投用记录：哪罐酵母投给了哪个批次。"""
+
+    id: str
+    culture_id: str
+    batch_id: str
+    tank_id: str
+    brewery_id: str
+    strain: str
+    generation: int
+    volume_l: float
+    temp_c: float
+    operator: str = ""
+    pitched_at: str = ""
+
+
+@dataclass
 class Batch(DocMixin):
     """一个酿造批次的全流程状态。"""
 
@@ -390,6 +452,8 @@ class Batch(DocMixin):
     boil_id: str | None = None
     tank_id: str | None = None
     cip_certificate_id: str | None = None
+    yeast_culture_id: str | None = None
+    yeast_pitch_id: str | None = None
     priority: str = "normal"
     notes: str = ""
     abort_reason: str | None = None

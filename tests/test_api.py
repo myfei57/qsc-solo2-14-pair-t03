@@ -44,7 +44,7 @@ class ApiTest(unittest.TestCase):
         self.assertEqual(200, status)
         self.assertIn("banner", overview)
         status, pages = self.call("GET", "/api/pages")
-        self.assertEqual(4, len(pages["pages"]))
+        self.assertEqual(5, len(pages["pages"]))
         self.assertGreaterEqual(len(pages["routes"]), 50)
 
     def test_sequence_error_maps_to_conflict(self) -> None:
@@ -67,3 +67,42 @@ class ApiTest(unittest.TestCase):
         with urllib.request.urlopen(self.base + "/static/app.js", timeout=10) as response:
             script = response.read().decode("utf-8")
         self.assertIn("initMashPage", script)
+
+    def test_yeast_workflow_over_http(self) -> None:
+        status, overview = self.call("GET", "/api/state")
+        brewery_id = overview["namespace"]["default_brewery_id"]
+        status, payload = self.call(
+            "POST",
+            "/api/yeast/cultures",
+            {
+                "brewery_id": brewery_id,
+                "strain": "WLP001",
+                "source": "propagated",
+                "volume_l": 100.0,
+                "operator": "api",
+            },
+        )
+        self.assertEqual(200, status)
+        culture_id = payload["culture"]["id"]
+        self.assertEqual("registered", payload["culture"]["status"])
+
+        status, payload = self.call(
+            "POST",
+            f"/api/yeast/cultures/{culture_id}/assay",
+            {"viability_pct": 88.0, "operator": "api"},
+        )
+        self.assertEqual(200, status)
+        self.assertEqual("quarantined", payload["culture"]["status"])
+
+        status, payload = self.call("GET", "/api/yeast/cultures?status=quarantined")
+        self.assertEqual(200, status)
+        self.assertEqual(1, len(payload["cultures"]))
+
+        status, summary = self.call("GET", "/api/yeast/summary")
+        self.assertEqual(200, status)
+        self.assertEqual(1, summary["summary"]["quarantined"])
+        self.assertEqual(5, summary["summary"]["generation_limit"])
+
+        with urllib.request.urlopen(self.base + "/yeast", timeout=10) as response:
+            html = response.read().decode("utf-8")
+        self.assertIn("酵母扩培", html)

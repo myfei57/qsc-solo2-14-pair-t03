@@ -13,6 +13,7 @@
         <a href="/mash">糖化</a>
         <a class="active" href="/ferment">发酵</a>
         <a href="/cip">清洗 CIP</a>
+        <a href="/yeast">酵母扩培</a>
         <a href="/alarms">告警与审计</a>
       </nav>
     </header>
@@ -67,8 +68,11 @@
             <input id="pitch-volume" type="number" step="10" value="1000" />
           </div>
         </div>
+        <label for="pitch-culture">酵母扩培批次（合格在库）</label>
+        <select id="pitch-culture"></select>
+        <button class="secondary" onclick="refreshQualifiedCultures()">刷新酵母库存</button>
         <button
-          onclick="run(() => apiPost('/api/batches/' + value('batch-select') + '/pitch', { tank_id: value('tank-select'), temp_c: numberValue('pitch-temp'), volume_l: numberValue('pitch-volume'), actor: value('operator') }), 'ferment-log', refreshBatch)"
+          onclick="run(() => apiPost('/api/batches/' + value('batch-select') + '/pitch', { tank_id: value('tank-select'), culture_id: value('pitch-culture'), temp_c: numberValue('pitch-temp'), volume_l: numberValue('pitch-volume'), actor: value('operator') }), 'ferment-log', () => { refreshBatch(); refreshQualifiedCultures(); })"
         >
           接种酵母
         </button>

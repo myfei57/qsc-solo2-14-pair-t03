@@ -147,7 +147,15 @@ class FermentTankService:
         with self.store.locks.guard(f"tank:{tank_id}"):
             return self.tanks.update(tank_id, mutate)
 
-    def pitch(self, tank_id: str, temp_c: float, volume_l: float) -> dict[str, Any]:
+    def pitch(
+        self,
+        tank_id: str,
+        temp_c: float,
+        volume_l: float,
+        culture_id: str | None = None,
+        strain: str | None = None,
+        generation: int | None = None,
+    ) -> dict[str, Any]:
         """接种酵母；温度必须已经降到接种上限以下。"""
 
         temperature = require_number(temp_c, field="temp_c", minimum=-5.0, maximum=60.0)
@@ -168,16 +176,17 @@ class FermentTankService:
                     limit_c=self.settings.pitch_temp_max_c,
                 )
             now = format_moment(self.clock.now())
-            return merge_documents(
-                document,
-                [
-                    ("stage", FermentStage.PITCHED.value),
-                    ("pitched_at", now),
-                    ("pitch_temp_c", temperature),
-                    ("pitch_volume_l", volume),
-                    ("updated_at", now),
-                ],
-            )
+            patch = [
+                ("stage", FermentStage.PITCHED.value),
+                ("pitched_at", now),
+                ("pitch_temp_c", temperature),
+                ("pitch_volume_l", volume),
+                ("yeast_culture_id", culture_id),
+                ("yeast_strain", strain),
+                ("yeast_generation", generation),
+                ("updated_at", now),
+            ]
+            return merge_documents(document, patch)
 
         with self.store.locks.guard(f"tank:{tank_id}"):
             document = self.tanks.update(tank_id, mutate)
@@ -187,7 +196,12 @@ class FermentTankService:
             severity="info",
             code="yeast_pitched",
             message=f"发酵罐 {document.get('code')} 已完成接种",
-            context={"batch_id": document.get("batch_id"), "temp_c": temperature},
+            context={
+                "batch_id": document.get("batch_id"),
+                "temp_c": temperature,
+                "culture_id": culture_id,
+                "generation": generation,
+            },
         )
         return document
 
@@ -252,6 +266,9 @@ class FermentTankService:
                     ("batch_id", None),
                     ("sanitized_at", None),
                     ("cip_certificate_id", None),
+                    ("yeast_culture_id", None),
+                    ("yeast_strain", None),
+                    ("yeast_generation", None),
                     ("emptied_by", clean_operator),
                     ("updated_at", now),
                 ],

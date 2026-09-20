@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>BreweryCtl · 酵母扩培</title>
+    <link rel="stylesheet" href="/static/style.css" />
+  </head>
+  <body>
+    <header>
+      <h1>BreweryCtl 酵母扩培与代次管理</h1>
+      <nav>
+        <a href="/mash">糖化</a>
+        <a href="/ferment">发酵</a>
+        <a href="/cip">清洗 CIP</a>
+        <a class="active" href="/yeast">酵母扩培</a>
+        <a href="/alarms">告警与审计</a>
+      </nav>
+    </header>
+    <div class="banner">
+      在制批次 <strong id="banner-batches">-</strong>
+      占用罐体 <strong id="banner-tanks">-</strong>
+      合格酵母 <strong id="banner-yeast">-</strong>
+      隔离酵母 <strong id="banner-yeast-quarantine">-</strong>
+      活跃告警 <strong id="banner-alarms">-</strong>
+    </div>
+    <main>
+      <section>
+        <h2>库存概览</h2>
+        <pre id="yeast-summary">尚未加载</pre>
+        <button class="secondary" onclick="loadCultures(); loadYeastSummary()">刷新</button>
+      </section>
+
+      <section>
+        <h2>登记扩培批次</h2>
+        <label for="reg-brewery">酒厂 ID</label>
+        <input id="reg-brewery" value="" placeholder="留空使用默认酒厂" />
+        <label for="reg-strain">菌株</label>
+        <input id="reg-strain" value="WLP001 California Ale" />
+        <label for="reg-source">来源</label>
+        <select id="reg-source">
+          <option value="propagated">实验室扩培（第 0 代）</option>
+          <option value="pitched">外购商品酵母</option>
+          <option value="cropped">发酵结束回收扩培（自动 +1 代）</option>
+        </select>
+        <label for="reg-parent">母罐批次（仅回收扩培需要）</label>
+        <select id="reg-parent"></select>
+        <div class="inline">
+          <div>
+            <label for="reg-volume">体积 (L)</label>
+            <input id="reg-volume" type="number" step="10" value="100" />
+          </div>
+          <div>
+            <label for="reg-cells">细胞数 (百万/mL，可选)</label>
+            <input id="reg-cells" type="number" step="10" value="120" />
+          </div>
+        </div>
+        <label for="reg-operator">操作员</label>
+        <input id="reg-operator" value="console" />
+        <button onclick="run(registerCulture, 'yeast-log', () => { loadCultures(); loadYeastSummary(); })">登记</button>
+        <div id="yeast-log"></div>
+      </section>
+
+      <section>
+        <h2>酵母批次与活性检测</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>编号</th>
+              <th>菌株</th>
+              <th>来源</th>
+              <th>代数</th>
+              <th>状态</th>
+              <th>活性 %</th>
+              <th>体积 L</th>
+              <th>去向批次</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody id="culture-rows"></tbody>
+        </table>
+      </section>
+
+      <section>
+        <h2>活性检测 / 废弃 / 代次链</h2>
+        <label for="culture-select">酵母批次</label>
+        <select id="culture-select" onchange="loadCultureDetail()"></select>
+        <div class="inline">
+          <div>
+            <label for="assay-viability">活性 (%)</label>
+            <input id="assay-viability" type="number" step="0.1" value="95" />
+          </div>
+          <div>
+            <label for="assay-cells">细胞数 (百万/mL，可选)</label>
+            <input id="assay-cells" type="number" step="10" value="120" />
+          </div>
+        </div>
+        <label for="assay-operator">操作员</label>
+        <input id="assay-operator" value="console" />
+        <button onclick="run(submitAssay, 'assay-log', () => { loadCultures(); loadCultureDetail(); loadYeastSummary(); })">
+          录入活性检测
+        </button>
+        <label for="discard-reason">废弃原因</label>
+        <input id="discard-reason" value="" placeholder="废弃时填写" />
+        <button class="secondary" onclick="run(discardCulture, 'assay-log', () => { loadCultures(); loadCultureDetail(); loadYeastSummary(); })">
+          废弃该批次
+        </button>
+        <button class="secondary" onclick="run(loadLineage, 'assay-log')">查看代次链</button>
+        <pre id="culture-detail">尚未加载</pre>
+        <pre id="lineage-view"></pre>
+        <div id="assay-log"></div>
+      </section>
+    </main>
+    <script src="/static/app.js"></script>
+    <script>
+      initYeastPage();
+    </script>
+  </body>
+</html>

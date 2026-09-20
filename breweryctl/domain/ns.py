@@ -143,6 +143,7 @@ class NamespaceRegistry:
         breweries = self.list_breweries()
         return {
             "breweries": len(breweries),
+            "default_brewery_id": breweries[0]["id"] if breweries else None,
             "lines": self.lines.count(),
             "quota": {
                 item["id"]: self.usage(item["id"])["active"] for item in breweries

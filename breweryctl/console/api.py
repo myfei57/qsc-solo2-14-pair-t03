@@ -43,6 +43,14 @@ ROUTES: tuple[tuple[str, str], ...] = (
     ("POST", "/api/batches/{batch_id}/mature"),
     ("POST", "/api/batches/{batch_id}/complete"),
     ("POST", "/api/batches/{batch_id}/abort"),
+    ("GET", "/api/yeast/cultures"),
+    ("POST", "/api/yeast/cultures"),
+    ("GET", "/api/yeast/cultures/{culture_id}"),
+    ("POST", "/api/yeast/cultures/{culture_id}/assay"),
+    ("POST", "/api/yeast/cultures/{culture_id}/discard"),
+    ("GET", "/api/yeast/cultures/{culture_id}/lineage"),
+    ("GET", "/api/yeast/cultures/{culture_id}/pitches"),
+    ("GET", "/api/yeast/summary"),
     ("GET", "/api/control/tanks"),
     ("GET", "/api/control/tanks/{tank_id}"),
     ("POST", "/api/control/tanks/{tank_id}/pressure"),
@@ -327,6 +335,7 @@ class ApiRouter:
             body.get("temp_c"),
             body.get("volume_l"),
             body.get("actor"),
+            culture_id=body.get("culture_id"),
         )
 
     def _handle_POST_api_batches_batch_id_mature(
@@ -347,6 +356,77 @@ class ApiRouter:
         return self.registry.brewing.abort_batch(
             params["batch_id"], body.get("reason"), body.get("actor")
         )
+
+    def _handle_GET_api_yeast_cultures(
+        self, params: dict[str, str], query: dict[str, list[str]], body: dict[str, Any]
+    ) -> dict[str, Any]:
+        items = self.registry.yeast.list_cultures(
+            brewery_id=_first(query, "brewery_id"),
+            status=_first(query, "status"),
+            strain=_first(query, "strain"),
+        )
+        return {"cultures": [serializers.yeast_summary(item) for item in items]}
+
+    def _handle_POST_api_yeast_cultures(
+        self, params: dict[str, str], query: dict[str, list[str]], body: dict[str, Any]
+    ) -> dict[str, Any]:
+        culture = self.registry.yeast.register_culture(
+            brewery_id=body.get("brewery_id"),
+            strain=body.get("strain"),
+            source=body.get("source", "propagated"),
+            volume_l=body.get("volume_l"),
+            operator=body.get("operator"),
+            generation=body.get("generation"),
+            parent_id=body.get("parent_id"),
+            cell_count_m_ml=body.get("cell_count_m_ml"),
+        )
+        return {"culture": serializers.yeast_summary(culture)}
+
+    def _handle_GET_api_yeast_cultures_culture_id(
+        self, params: dict[str, str], query: dict[str, list[str]], body: dict[str, Any]
+    ) -> dict[str, Any]:
+        culture = self.registry.yeast.get(params["culture_id"])
+        return {
+            "culture": culture,
+            "pitches": self.registry.yeast.pitches_for_culture(params["culture_id"]),
+        }
+
+    def _handle_POST_api_yeast_cultures_culture_id_assay(
+        self, params: dict[str, str], query: dict[str, list[str]], body: dict[str, Any]
+    ) -> dict[str, Any]:
+        culture = self.registry.yeast.assay(
+            params["culture_id"],
+            body.get("viability_pct"),
+            body.get("operator"),
+            cell_count_m_ml=body.get("cell_count_m_ml"),
+            reject_reason=body.get("reject_reason"),
+        )
+        return {"culture": serializers.yeast_summary(culture)}
+
+    def _handle_POST_api_yeast_cultures_culture_id_discard(
+        self, params: dict[str, str], query: dict[str, list[str]], body: dict[str, Any]
+    ) -> dict[str, Any]:
+        culture = self.registry.yeast.discard(
+            params["culture_id"], body.get("reason"), body.get("operator")
+        )
+        return {"culture": serializers.yeast_summary(culture)}
+
+    def _handle_GET_api_yeast_cultures_culture_id_lineage(
+        self, params: dict[str, str], query: dict[str, list[str]], body: dict[str, Any]
+    ) -> dict[str, Any]:
+        chain = self.registry.yeast.lineage(params["culture_id"])
+        return {"culture_id": params["culture_id"], "lineage": [serializers.yeast_summary(item) for item in chain]}
+
+    def _handle_GET_api_yeast_cultures_culture_id_pitches(
+        self, params: dict[str, str], query: dict[str, list[str]], body: dict[str, Any]
+    ) -> dict[str, Any]:
+        items = self.registry.yeast.pitches_for_culture(params["culture_id"])
+        return {"culture_id": params["culture_id"], "pitches": items}
+
+    def _handle_GET_api_yeast_summary(
+        self, params: dict[str, str], query: dict[str, list[str]], body: dict[str, Any]
+    ) -> dict[str, Any]:
+        return {"summary": self.registry.yeast.summary(_first(query, "brewery_id"))}
 
     def _handle_GET_api_control_tanks(
         self, params: dict[str, str], query: dict[str, list[str]], body: dict[str, Any]
