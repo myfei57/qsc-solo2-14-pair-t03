@@ -51,6 +51,7 @@ def batch_summary(document: dict[str, Any]) -> dict[str, Any]:
         "recipe_version": document.get("recipe_version"),
         "volume_l": document.get("volume_l"),
         "tank_id": document.get("tank_id"),
+        "yeast_batch_id": document.get("yeast_batch_id"),
         "priority": document.get("priority"),
         "created_at": document.get("created_at"),
         "updated_at": document.get("updated_at"),

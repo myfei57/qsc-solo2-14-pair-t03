@@ -18,11 +18,13 @@ from ..domain.ns import NamespaceRegistry
 from ..domain.recipe import RecipeRegistry
 from ..domain.temp import TemperatureController
 from ..domain.wort import WortSystem
+from ..domain.yeast import YeastCenter
 from ..persistence.store import FileStore
 from .brewing import BrewingService
 from .control import ControlService
 from .maintenance import MaintenanceService
 from .telemetry import TelemetryService
+from .yeast import YeastService
 
 
 class ComponentRegistry:
@@ -43,6 +45,7 @@ class ComponentRegistry:
         self.temp = TemperatureController(self.store, self.settings, self.clock)
         self.co2 = CO2Controller(self.store, self.settings, self.clock, self.alarms)
         self.cip = CIPService(self.store, self.settings, self.clock, self.alarms)
+        self.yeast = YeastCenter(self.store, self.settings, self.clock, self.alarms)
         self.tanks = FermentTankService(
             self.store, self.settings, self.clock, self.cip, self.co2, self.alarms
         )
@@ -61,10 +64,12 @@ class ComponentRegistry:
             self.co2,
             self.alarms,
             self.audit,
+            self.yeast,
         )
         self.control = ControlService(self.temp, self.co2, self.alarms, self.audit)
         self.telemetry = TelemetryService(self.temp, self.alarms, self.audit)
         self.maintenance = MaintenanceService(self.cip, self.tanks, self.audit)
+        self.yeast_service = YeastService(self.yeast, self.audit)
 
     def bootstrap(self) -> dict[str, Any]:
         """确保存在可运行的默认命名空间、罐体、探头与配方。"""
@@ -96,6 +101,14 @@ class ComponentRegistry:
                 [str(tank["id"]) for tank in tanks],
                 12.0,
             )
+        if not self.yeast.list_batches(str(brewery["id"])):
+            seeded = self.yeast.register_propagation(
+                brewery_id=str(brewery["id"]),
+                strain="US-05 美式艾尔酵母",
+                propagated_volume_l=20.0,
+            )
+            self.yeast.record_viability(str(seeded["id"]), 96.0)
+            created["yeast"] = seeded["id"]
         probes = [
             item for item in self.temp.probes.all() if item.get("brewery_id") == brewery["id"]
         ]
@@ -128,6 +141,7 @@ class ComponentRegistry:
             "mash": self.mash.summary(),
             "boil": self.boil.summary(),
             "ferment": self.tanks.summary(),
+            "yeast": self.yeast.summary(),
             "maintenance": self.maintenance.summary(),
             "control": self.control.summary(),
             "alarms": self.alarms.summary(),

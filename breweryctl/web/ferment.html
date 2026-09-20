@@ -13,6 +13,7 @@
         <a href="/mash">糖化</a>
         <a class="active" href="/ferment">发酵</a>
         <a href="/cip">清洗 CIP</a>
+        <a href="/yeast">酵母扩培</a>
         <a href="/alarms">告警与审计</a>
       </nav>
     </header>
@@ -67,8 +68,11 @@
             <input id="pitch-volume" type="number" step="10" value="1000" />
           </div>
         </div>
+        <label for="yeast-select">酵母批次（仅显示已放行）</label>
+        <select id="yeast-select"></select>
+        <button class="secondary" onclick="loadYeastOptions()">刷新酵母</button>
         <button
-          onclick="run(() => apiPost('/api/batches/' + value('batch-select') + '/pitch', { tank_id: value('tank-select'), temp_c: numberValue('pitch-temp'), volume_l: numberValue('pitch-volume'), actor: value('operator') }), 'ferment-log', refreshBatch)"
+          onclick="run(() => apiPost('/api/batches/' + value('batch-select') + '/pitch', { tank_id: value('tank-select'), yeast_batch_id: value('yeast-select'), temp_c: numberValue('pitch-temp'), volume_l: numberValue('pitch-volume'), actor: value('operator') }), 'ferment-log', () => { refreshBatch(); loadYeastOptions(); })"
         >
           接种酵母
         </button>

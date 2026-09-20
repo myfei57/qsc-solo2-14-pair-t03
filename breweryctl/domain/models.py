@@ -113,6 +113,22 @@ class ReadingQuality(str, Enum):
     REJECTED = "rejected"
 
 
+class YeastSource(str, Enum):
+    """酵母扩培批次来源。"""
+
+    LAB = "lab"
+    HARVEST = "harvest"
+
+
+class YeastStatus(str, Enum):
+    """酵母扩培批次状态机。"""
+
+    PROPAGATING = "propagating"
+    RELEASED = "released"
+    REJECTED = "rejected"
+    CONSUMED = "consumed"
+
+
 class DocMixin:
     """把数据类转换为可持久化文档。"""
 
@@ -375,6 +391,47 @@ class AuditEntry(DocMixin):
 
 
 @dataclass
+class YeastBatch(DocMixin):
+    """一罐酵母的扩培批次：从登记、活性判定到投用或淘汰。"""
+
+    id: str
+    code: str
+    brewery_id: str
+    strain: str
+    generation: int
+    source: str = YeastSource.LAB.value
+    parent_yeast_id: str | None = None
+    harvest_pitch_id: str | None = None
+    propagated_volume_l: float = 0.0
+    status: str = YeastStatus.PROPAGATING.value
+    viability_pct: float | None = None
+    viability_checked_at: str | None = None
+    rejected_reason: str | None = None
+    pitched_count: int = 0
+    registered_at: str = ""
+    released_at: str | None = None
+    rejected_at: str | None = None
+    consumed_at: str | None = None
+    updated_at: str = ""
+
+
+@dataclass
+class YeastPitchRecord(DocMixin):
+    """一次接种事实：哪罐酵母投给了哪个酿造批次。"""
+
+    id: str
+    yeast_batch_id: str
+    batch_id: str
+    tank_id: str
+    generation: int
+    viability_pct: float | None
+    volume_l: float
+    temp_c: float
+    operator: str
+    pitched_at: str
+
+
+@dataclass
 class Batch(DocMixin):
     """一个酿造批次的全流程状态。"""
 
@@ -390,6 +447,8 @@ class Batch(DocMixin):
     boil_id: str | None = None
     tank_id: str | None = None
     cip_certificate_id: str | None = None
+    yeast_batch_id: str | None = None
+    yeast_pitch_id: str | None = None
     priority: str = "normal"
     notes: str = ""
     abort_reason: str | None = None

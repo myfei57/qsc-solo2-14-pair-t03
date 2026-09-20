@@ -40,6 +40,7 @@ ROUTES: tuple[tuple[str, str], ...] = (
     ("POST", "/api/batches/{batch_id}/cooled"),
     ("POST", "/api/batches/{batch_id}/transfer"),
     ("POST", "/api/batches/{batch_id}/pitch"),
+    ("GET", "/api/batches/{batch_id}/yeast"),
     ("POST", "/api/batches/{batch_id}/mature"),
     ("POST", "/api/batches/{batch_id}/complete"),
     ("POST", "/api/batches/{batch_id}/abort"),
@@ -69,6 +70,13 @@ ROUTES: tuple[tuple[str, str], ...] = (
     ("POST", "/api/alarms/{alarm_id}/ack"),
     ("POST", "/api/alarms/{alarm_id}/resolve"),
     ("GET", "/api/audit"),
+    ("GET", "/api/yeast/batches"),
+    ("POST", "/api/yeast/batches"),
+    ("GET", "/api/yeast/batches/{yeast_batch_id}"),
+    ("POST", "/api/yeast/batches/{yeast_batch_id}/viability"),
+    ("GET", "/api/yeast/batches/{yeast_batch_id}/lineage"),
+    ("GET", "/api/yeast/batches/{yeast_batch_id}/pitches"),
+    ("POST", "/api/yeast/pitches/{pitch_id}/harvest"),
 )
 
 
@@ -324,10 +332,16 @@ class ApiRouter:
         return self.registry.brewing.pitch_yeast(
             params["batch_id"],
             body.get("tank_id"),
+            body.get("yeast_batch_id"),
             body.get("temp_c"),
             body.get("volume_l"),
             body.get("actor"),
         )
+
+    def _handle_GET_api_batches_batch_id_yeast(
+        self, params: dict[str, str], query: dict[str, list[str]], body: dict[str, Any]
+    ) -> dict[str, Any]:
+        return self.registry.yeast_service.trace_batch(params["batch_id"])
 
     def _handle_POST_api_batches_batch_id_mature(
         self, params: dict[str, str], query: dict[str, list[str]], body: dict[str, Any]
@@ -529,6 +543,69 @@ class ApiRouter:
         limit = _optional_int(_first(query, "limit"), field="limit", default=100, minimum=1, maximum=1000)
         entries = self.registry.audit.history(batch_id=batch_id, limit=limit)
         return {"entries": entries, "count": len(entries)}
+
+    def _handle_GET_api_yeast_batches(
+        self, params: dict[str, str], query: dict[str, list[str]], body: dict[str, Any]
+    ) -> dict[str, Any]:
+        items = self.registry.yeast.list_batches(
+            brewery_id=_first(query, "brewery_id"),
+            status=_first(query, "status"),
+        )
+        return {"batches": items, "summary": self.registry.yeast.summary()}
+
+    def _handle_POST_api_yeast_batches(
+        self, params: dict[str, str], query: dict[str, list[str]], body: dict[str, Any]
+    ) -> dict[str, Any]:
+        brewery_id = body.get("brewery_id")
+        if not brewery_id:
+            breweries = self.registry.namespaces.list_breweries()
+            if not breweries:
+                raise ValidationError("尚未登记工厂，无法创建酵母批次", field="brewery_id")
+            brewery_id = breweries[0]["id"]
+        document = self.registry.yeast_service.register_propagation(
+            brewery_id=brewery_id,
+            strain=body.get("strain"),
+            propagated_volume_l=body.get("propagated_volume_l"),
+            actor=body.get("actor"),
+        )
+        return {"batch": document}
+
+    def _handle_GET_api_yeast_batches_yeast_batch_id(
+        self, params: dict[str, str], query: dict[str, list[str]], body: dict[str, Any]
+    ) -> dict[str, Any]:
+        yeast_batch_id = params["yeast_batch_id"]
+        return {
+            "batch": self.registry.yeast.get(yeast_batch_id),
+            "pitches": self.registry.yeast.pitches_for(yeast_batch_id),
+            "lineage": self.registry.yeast_service.lineage(yeast_batch_id),
+        }
+
+    def _handle_POST_api_yeast_batches_yeast_batch_id_viability(
+        self, params: dict[str, str], query: dict[str, list[str]], body: dict[str, Any]
+    ) -> dict[str, Any]:
+        document = self.registry.yeast_service.record_viability(
+            params["yeast_batch_id"], body.get("viability_pct"), body.get("actor")
+        )
+        return {"batch": document}
+
+    def _handle_GET_api_yeast_batches_yeast_batch_id_lineage(
+        self, params: dict[str, str], query: dict[str, list[str]], body: dict[str, Any]
+    ) -> dict[str, Any]:
+        return self.registry.yeast_service.lineage(params["yeast_batch_id"])
+
+    def _handle_GET_api_yeast_batches_yeast_batch_id_pitches(
+        self, params: dict[str, str], query: dict[str, list[str]], body: dict[str, Any]
+    ) -> dict[str, Any]:
+        records = self.registry.yeast.pitches_for(params["yeast_batch_id"])
+        return {"pitches": records, "count": len(records)}
+
+    def _handle_POST_api_yeast_pitches_pitch_id_harvest(
+        self, params: dict[str, str], query: dict[str, list[str]], body: dict[str, Any]
+    ) -> dict[str, Any]:
+        document = self.registry.yeast_service.harvest(
+            params["pitch_id"], body.get("propagated_volume_l"), body.get("actor")
+        )
+        return {"batch": document}
 
 
 def _handler_name(method: str, pattern: str) -> str:

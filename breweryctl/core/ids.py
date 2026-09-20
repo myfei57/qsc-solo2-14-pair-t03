@@ -53,3 +53,11 @@ def circuit_code(index: int) -> str:
     if index < 1:
         raise ValidationError("CIP 回路序号必须为正整数", index=index)
     return f"CIP-{index:02d}"
+
+
+def yeast_code(sequence: int) -> str:
+    """生成酵母扩培批次编号，例如 ``Y-0007``。"""
+
+    if sequence < 1:
+        raise ValidationError("酵母批次序号必须为正整数", sequence=sequence)
+    return f"Y-{sequence:04d}"

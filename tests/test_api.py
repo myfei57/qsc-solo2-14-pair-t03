@@ -44,8 +44,8 @@ class ApiTest(unittest.TestCase):
         self.assertEqual(200, status)
         self.assertIn("banner", overview)
         status, pages = self.call("GET", "/api/pages")
-        self.assertEqual(4, len(pages["pages"]))
-        self.assertGreaterEqual(len(pages["routes"]), 50)
+        self.assertEqual(5, len(pages["pages"]))
+        self.assertGreaterEqual(len(pages["routes"]), 55)
 
     def test_sequence_error_maps_to_conflict(self) -> None:
         batch_id = create_batch(self.app)
@@ -64,6 +64,10 @@ class ApiTest(unittest.TestCase):
         with urllib.request.urlopen(self.base + "/mash", timeout=10) as response:
             html = response.read().decode("utf-8")
         self.assertIn("糖化控制", html)
+        with urllib.request.urlopen(self.base + "/yeast", timeout=10) as response:
+            yeast_html = response.read().decode("utf-8")
+        self.assertIn("酵母扩培", yeast_html)
         with urllib.request.urlopen(self.base + "/static/app.js", timeout=10) as response:
             script = response.read().decode("utf-8")
         self.assertIn("initMashPage", script)
+        self.assertIn("initYeastPage", script)

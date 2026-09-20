@@ -21,6 +21,7 @@ from ..domain.ns import NamespaceRegistry
 from ..domain.recipe import RecipeRegistry
 from ..domain.temp import TemperatureController
 from ..domain.wort import WortSystem
+from ..domain.yeast import YeastCenter
 from ..persistence.store import FileStore, merge_documents
 
 BATCHES = "batches"
@@ -45,6 +46,7 @@ class BrewingService:
         co2: CO2Controller,
         alarms: AlarmCenter,
         audit: AuditLog,
+        yeast: YeastCenter,
     ) -> None:
         self.store = store
         self.settings = settings
@@ -60,6 +62,7 @@ class BrewingService:
         self.co2 = co2
         self.alarms = alarms
         self.audit = audit
+        self.yeast = yeast
         self.batches = store.collection(BATCHES)
 
     def create_batch(
@@ -268,20 +271,52 @@ class BrewingService:
         )
         return self.status(batch_id)
 
-    def pitch_yeast(self, batch_id: str, tank_id: str, temp_c: float, volume_l: float, actor: str) -> dict[str, Any]:
-        """接种酵母并进入发酵。"""
+    def pitch_yeast(
+        self,
+        batch_id: str,
+        tank_id: str,
+        yeast_batch_id: str,
+        temp_c: float,
+        volume_l: float,
+        actor: str,
+    ) -> dict[str, Any]:
+        """接种合格酵母并进入发酵；代次超限或活性不合格会被拦住。"""
 
         batch = self._require_batch(batch_id)
         self.temp.require_pitch_temperature(batch_id)
+        # 先做酵母联锁校验：不合格时发酵罐状态不应发生任何变化
+        self.yeast.require_pitchable(yeast_batch_id)
         tank = self.tanks.pitch(tank_id, temp_c, volume_l)
         self.tanks.start_fermentation(tank_id)
         self.co2.set_pressure(tank_id, min(0.2, self.settings.pressure_limit_bar * 0.5))
-        self._set_stage(batch, BatchStage.FERMENTING.value, tank_id=tank_id)
+        yeast_record = self.yeast.record_pitch(
+            yeast_batch_id=yeast_batch_id,
+            batch_id=batch_id,
+            tank_id=tank_id,
+            volume_l=volume_l,
+            temp_c=temp_c,
+            operator=actor,
+        )
+        self._set_stage(
+            batch,
+            BatchStage.FERMENTING.value,
+            tank_id=tank_id,
+            yeast_batch_id=yeast_batch_id,
+            yeast_pitch_id=yeast_record["id"],
+        )
         self._audit(
             batch,
             actor,
             "ferment.pitched",
-            {"tank_id": tank_id, "temp_c": temp_c, "volume_l": volume_l},
+            {
+                "tank_id": tank_id,
+                "yeast_batch_id": yeast_batch_id,
+                "yeast_pitch_id": yeast_record["id"],
+                "generation": yeast_record.get("generation"),
+                "viability_pct": yeast_record.get("viability_pct"),
+                "temp_c": temp_c,
+                "volume_l": volume_l,
+            },
         )
         return self.status(batch_id)
 
@@ -374,6 +409,10 @@ class BrewingService:
             view["temperature"] = setpoint
         if batch.get("tank_id"):
             view["tank"] = self.tanks.status(str(batch["tank_id"]))
+        yeast_pitch = self.yeast.pitch_for_batch(batch_id)
+        if yeast_pitch is not None:
+            view["yeast_pitch"] = yeast_pitch
+            view["yeast_batch"] = self.yeast.get(str(yeast_pitch["yeast_batch_id"]))
         return view
 
     def list_batches(self, stage: str | None = None) -> list[dict[str, Any]]:

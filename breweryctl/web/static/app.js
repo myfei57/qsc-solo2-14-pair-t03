@@ -161,8 +161,139 @@ async function initFermentPage() {
   await loadBanner();
   await loadBatches("batch-select");
   await loadTanks("tank-select");
+  await loadYeastOptions("yeast-select");
   await refreshBatch();
   await refreshTankSnapshot();
+}
+
+async function loadYeastOptions(selectId) {
+  const target = selectId || "yeast-select";
+  const payload = await apiGet("/api/yeast/batches?status=released");
+  const select = element(target);
+  if (select) {
+    select.innerHTML = "";
+    payload.batches.forEach((item) => {
+      const option = document.createElement("option");
+      option.value = item.id;
+      option.textContent = item.code + " · 第" + item.generation + "代 · " + item.strain;
+      select.appendChild(option);
+    });
+  }
+  return payload.batches;
+}
+
+async function initYeastPage() {
+  await loadBanner();
+  await loadBatches("batch-trace-select");
+  await refreshYeastList();
+}
+
+async function refreshYeastList() {
+  const status = value("yeast-status") || "";
+  const path = "/api/yeast/batches" + (status ? "?status=" + encodeURIComponent(status) : "");
+  const payload = await apiGet(path);
+  STATE.yeast = payload.batches;
+  const tbody = element("yeast-rows");
+  tbody.innerHTML = "";
+  payload.batches.forEach((item) => {
+    const row = document.createElement("tr");
+    row.innerHTML =
+      "<td>" + item.code + "</td><td>" + item.strain + "</td><td>第" + item.generation + "代</td><td>" +
+      item.source + "</td><td>" +
+      (item.viability_pct == null ? "未检测" : item.viability_pct + "%") +
+      "</td><td>" + item.status + "</td>";
+    const actions = document.createElement("td");
+
+    const pass = document.createElement("button");
+    pass.textContent = "合格放行";
+    pass.onclick = () =>
+      run(
+        () => submitViability(item.id, 96),
+        "yeast-log",
+        refreshYeastList
+      );
+    const reject = document.createElement("button");
+    reject.textContent = "活性不合格";
+    reject.className = "secondary";
+    reject.onclick = () =>
+      run(
+        () => submitViability(item.id, 80),
+        "yeast-log",
+        refreshYeastList
+      );
+    const lineage = document.createElement("button");
+    lineage.textContent = "代次链";
+    lineage.className = "secondary";
+    lineage.onclick = () =>
+      run(
+        () => apiGet("/api/yeast/batches/" + item.id + "/lineage"),
+        "yeast-log",
+        (payload) => write("yeast-lineage", payload)
+      );
+    const pitches = document.createElement("button");
+    pitches.textContent = "投用记录";
+    pitches.className = "secondary";
+    pitches.onclick = () =>
+      run(
+        () => apiGet("/api/yeast/batches/" + item.id + "/pitches"),
+        "yeast-log",
+        (payload) => write("yeast-pitches", payload)
+      );
+    const harvest = document.createElement("button");
+    harvest.textContent = "回收扩培";
+    harvest.className = "secondary";
+    harvest.onclick = () => run(() => harvestFromFirstPitch(item.id), "yeast-log", refreshYeastList);
+
+    actions.appendChild(pass);
+    actions.appendChild(reject);
+    actions.appendChild(lineage);
+    actions.appendChild(pitches);
+    actions.appendChild(harvest);
+    row.appendChild(actions);
+    tbody.appendChild(row);
+  });
+  write("yeast-summary", payload.summary);
+  return payload;
+}
+
+async function submitViability(yeastBatchId, viability) {
+  const custom = value("viability-" + yeastBatchId);
+  const payload = await apiPost("/api/yeast/batches/" + yeastBatchId + "/viability", {
+    viability_pct: custom ? Number(custom) : viability,
+    actor: value("operator") || "console",
+  });
+  return payload;
+}
+
+async function registerYeast() {
+  const payload = await apiPost("/api/yeast/batches", {
+    brewery_id: value("brewery-id") || null,
+    strain: value("yeast-strain"),
+    propagated_volume_l: numberValue("yeast-volume"),
+    actor: value("operator") || "console",
+  });
+  return payload;
+}
+
+async function harvestFromFirstPitch(yeastBatchId) {
+  const report = await apiGet("/api/yeast/batches/" + yeastBatchId + "/pitches");
+  if (!report.pitches.length) {
+    throw new Error("该罐酵母还没有投用记录，无法回收");
+  }
+  return apiPost("/api/yeast/pitches/" + report.pitches[0].id + "/harvest", {
+    propagated_volume_l: numberValue("harvest-volume") || 20,
+    actor: value("operator") || "console",
+  });
+}
+
+async function traceBatchYeast() {
+  const batchId = value("batch-trace-select");
+  if (!batchId) {
+    return null;
+  }
+  const payload = await apiGet("/api/batches/" + batchId + "/yeast");
+  write("yeast-trace", payload);
+  return payload;
 }
 
 async function initCipPage() {

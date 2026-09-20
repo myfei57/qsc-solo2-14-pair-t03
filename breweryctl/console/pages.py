@@ -43,6 +43,19 @@ PAGE_CATALOG: tuple[dict[str, Any], ...] = (
         ],
     },
     {
+        "slug": "yeast",
+        "title": "酵母扩培",
+        "file": "yeast.html",
+        "description": "扩培批次登记、活性判定、代次上限与接种追溯",
+        "api": [
+            "/api/yeast/batches",
+            "/api/yeast/batches/{yeast_batch_id}/viability",
+            "/api/yeast/batches/{yeast_batch_id}/lineage",
+            "/api/yeast/pitches/{pitch_id}/harvest",
+            "/api/batches/{batch_id}/pitch",
+        ],
+    },
+    {
         "slug": "alarms",
         "title": "告警与审计",
         "file": "alarms.html",

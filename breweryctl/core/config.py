@@ -27,6 +27,8 @@ class Settings:
     cip_certificate_ttl_min: int = 240
     pressure_limit_bar: float = 1.8
     hop_window_slack_min: float = 5.0
+    yeast_max_generation: int = 5
+    yeast_min_viability_pct: float = 90.0
     log_level: str = "INFO"
 
     def validate(self) -> "Settings":
@@ -40,6 +42,13 @@ class Settings:
         require_int(self.cip_certificate_ttl_min, field="cip_certificate_ttl_min", minimum=5, maximum=2880)
         require_number(self.pressure_limit_bar, field="pressure_limit_bar", minimum=0.1, maximum=10.0)
         require_number(self.hop_window_slack_min, field="hop_window_slack_min", minimum=0.0, maximum=60.0)
+        require_int(self.yeast_max_generation, field="yeast_max_generation", minimum=0, maximum=20)
+        require_number(
+            self.yeast_min_viability_pct,
+            field="yeast_min_viability_pct",
+            minimum=1.0,
+            maximum=100.0,
+        )
         if self.log_level.upper() not in {"DEBUG", "INFO", "WARNING", "ERROR"}:
             raise ValidationError("log_level 取值不合法", field="log_level", value=self.log_level)
         return self
@@ -76,6 +85,8 @@ class Settings:
             "cip_certificate_ttl_min": self.cip_certificate_ttl_min,
             "pressure_limit_bar": self.pressure_limit_bar,
             "hop_window_slack_min": self.hop_window_slack_min,
+            "yeast_max_generation": self.yeast_max_generation,
+            "yeast_min_viability_pct": self.yeast_min_viability_pct,
             "log_level": self.log_level.upper(),
         }
 
@@ -85,12 +96,13 @@ class Settings:
 
         base = cls()
         text_keys = ("host", "log_level")
-        int_keys = ("port", "max_active_batches", "cip_certificate_ttl_min")
+        int_keys = ("port", "max_active_batches", "cip_certificate_ttl_min", "yeast_max_generation")
         float_keys = (
             "temp_tolerance_c",
             "pitch_temp_max_c",
             "pressure_limit_bar",
             "hop_window_slack_min",
+            "yeast_min_viability_pct",
         )
         values: dict[str, Any] = {}
         for key in text_keys:

@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>BreweryCtl · 酵母扩培</title>
+    <link rel="stylesheet" href="/static/style.css" />
+  </head>
+  <body>
+    <header>
+      <h1>BreweryCtl 酵母扩培与代次管理</h1>
+      <nav>
+        <a href="/mash">糖化</a>
+        <a href="/ferment">发酵</a>
+        <a href="/cip">清洗 CIP</a>
+        <a class="active" href="/yeast">酵母扩培</a>
+        <a href="/alarms">告警与审计</a>
+      </nav>
+    </header>
+    <div class="banner">
+      在制批次 <strong id="banner-batches">-</strong>
+      占用罐体 <strong id="banner-tanks">-</strong>
+      活跃告警 <strong id="banner-alarms">-</strong>
+      闩锁 <strong id="banner-latches">-</strong>
+    </div>
+    <main>
+      <section>
+        <h2>扩培批次登记</h2>
+        <label for="operator">操作员</label>
+        <input id="operator" value="console" />
+        <label for="yeast-strain">菌株</label>
+        <input id="yeast-strain" value="US-05 美式艾尔酵母" />
+        <label for="yeast-volume">扩培体积 (L)</label>
+        <input id="yeast-volume" type="number" step="0.5" value="20" />
+        <label for="brewery-id">工厂 ID（留空使用默认工厂）</label>
+        <input id="brewery-id" placeholder="默认工厂可留空" />
+        <button onclick="run(registerYeast, 'yeast-log', refreshYeastList)">登记扩培（第 0 代实验室菌种）</button>
+        <div id="yeast-log"></div>
+      </section>
+
+      <section>
+        <h2>酵母库存</h2>
+        <label for="yeast-status">状态过滤</label>
+        <select id="yeast-status" onchange="refreshYeastList()">
+          <option value="">全部</option>
+          <option value="propagating">扩培中</option>
+          <option value="released">已放行</option>
+          <option value="rejected">已淘汰</option>
+          <option value="consumed">已投用</option>
+        </select>
+        <button class="secondary" onclick="refreshYeastList()">刷新</button>
+        <pre id="yeast-summary">尚未加载</pre>
+        <table>
+          <thead>
+            <tr>
+              <th>编号</th><th>菌株</th><th>代次</th><th>来源</th><th>活性</th><th>状态</th><th>操作</th>
+            </tr>
+          </thead>
+          <tbody id="yeast-rows"></tbody>
+        </table>
+      </section>
+
+      <section>
+        <h2>回收扩培</h2>
+        <p>对已投用酵母泥回收再扩培一代（代次 +1，超过上限会被拦住）。</p>
+        <label for="harvest-volume">回收扩培体积 (L)</label>
+        <input id="harvest-volume" type="number" step="0.5" value="20" />
+        <p class="hint">在库存表中点击对应酵母行的「回收扩培」。</p>
+      </section>
+
+      <section>
+        <h2>批次接种追溯</h2>
+        <label for="batch-trace-select">酿造批次</label>
+        <select id="batch-trace-select" onchange="traceBatchYeast()"></select>
+        <button class="secondary" onclick="traceBatchYeast()">查询</button>
+        <pre id="yeast-trace">尚未查询</pre>
+      </section>
+
+      <section>
+        <h2>代次链与投用记录</h2>
+        <pre id="yeast-lineage">尚未查询</pre>
+        <pre id="yeast-pitches">尚未查询</pre>
+      </section>
+    </main>
+    <script src="/static/app.js"></script>
+    <script>
+      initYeastPage();
+    </script>
+  </body>
+</html>
